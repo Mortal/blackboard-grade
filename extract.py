@@ -65,10 +65,25 @@ def print_handin_info(i, group, data):
     print("%d. %s (%s; %s) %s" % (i + 1, group, comments, annotations, first_line))
 
 
-def handin_loop(handin):
+def previous_handin(group, data):
+    handin = data['handin']
+    o = re.match(r'(.*_)(\d+)', handin)
+    if o:
+        directory = o.group(1) + str(int(o.group(2)) - 1)
+        base = os.path.join(directory, group)
+        annotated = base + '_handin_ann.pdf'
+        if os.path.exists(annotated):
+            pass  # TODO
+
+
+def handin_loop(i, handin):
     group, data = handin
     subprocess.call(('pdfa', data['file']))
     subprocess.call(('vim', data['comments_file']))
+    while True:
+        print_handin_info(i, group, data)
+        print("0. Back")
+        print("1. Annotate and edit comments")
 
 
 def grade_loop(handins):
@@ -80,7 +95,7 @@ def grade_loop(handins):
         except KeyboardInterrupt:
             break
         if 0 <= i < len(handins):
-            handin_loop(handins[i])
+            handin_loop(i, handins[i])
 
 
 def print_comments(handins):
