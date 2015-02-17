@@ -48,6 +48,47 @@ def guess_params():
     return filename, attempt
 
 
+def handin_loop(handin):
+    group, data = handin
+    subprocess.call(('pdfa', data['file']))
+    subprocess.call(('vim', data['comments_file']))
+
+
+def grade_loop(handins):
+    while True:
+        for i, (group, data) in enumerate(handins):
+            try:
+                with open(data['comments_file']) as fp:
+                    comments_size = os.fstat(fp.fileno()).st_size
+                    comments = '%d B comments' % comments_size
+                    first_line = fp.readline().strip()
+            except FileNotFoundError:
+                comments = 'no comments'
+                first_line = ''
+            annotated_file = os.path.splitext(data['file'])[0] + '.pep'
+            if os.path.exists(annotated_file):
+                annotations = 'annotated'
+            else:
+                annotations = 'not annotated'
+            print("%d. %s (%s; %s) %s" % (i + 1, group, comments, annotations, first_line))
+        try:
+            i = int(input()) - 1
+        except KeyboardInterrupt:
+            break
+        if 0 <= i < len(handins):
+            handin_loop(handins[i])
+
+
+def print_comments(handins):
+    for group, data in handins:
+        print('%s' % (group,))
+        try:
+            with open(data['comments_file']) as fp:
+                print(fp.read())
+        except FileNotFoundError:
+            print("no comments\n")
+
+
 def main():
     args = sys.argv[1:]
     if len(args) == 0:
@@ -122,38 +163,8 @@ def main():
                         print("skipping %r" % handin['file'])
 
     handins = sorted(handins.items(), key=lambda x: x[0])
-    while True:
-        for i, (group, data) in enumerate(handins):
-            try:
-                with open(data['comments_file']) as fp:
-                    comments_size = os.fstat(fp.fileno()).st_size
-                    comments = '%d B comments' % comments_size
-                    first_line = fp.readline().strip()
-            except FileNotFoundError:
-                comments = 'no comments'
-                first_line = ''
-            annotated_file = os.path.splitext(data['file'])[0] + '.pep'
-            if os.path.exists(annotated_file):
-                annotations = 'annotated'
-            else:
-                annotations = 'not annotated'
-            print("%d. %s (%s; %s) %s" % (i + 1, group, comments, annotations, first_line))
-        try:
-            i = int(input()) - 1
-        except KeyboardInterrupt:
-            break
-        if 0 <= i < len(handins):
-            group, data = handins[i]
-            subprocess.call(('pdfa', data['file']))
-            subprocess.call(('vim', data['comments_file']))
-
-    for group, data in handins:
-        print('%s' % (group,))
-        try:
-            with open(data['comments_file']) as fp:
-                print(fp.read())
-        except FileNotFoundError:
-            print("no comments\n")
+    grade_loop(handins)
+    print_comments(handins)
 
 
 if __name__ == "__main__":
