@@ -1,5 +1,6 @@
 import os
 import re
+import sys
 import json
 import zipfile
 import argparse
@@ -32,16 +33,36 @@ FILES_FIELD = re.compile(
 EXTENSIONS = ['.pdf']
 
 
+def guess_params():
+    directory = os.path.expanduser('~/Downloads')
+    filenames = os.listdir(directory)
+    filenames = [
+        os.path.join(directory, f)
+        for f in filenames
+        if f.startswith('gradebook_BB') and f.endswith('.zip')
+    ]
+    filenames.sort(key=lambda f: os.stat(f).st_mtime)
+    filename = filenames[-1]
+    print("File: %s" % filename)
+    attempt = int(input("Attempt: "))
+    return filename, attempt
+
+
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--all', action='store_true')
-    parser.add_argument('filename')
-    parser.add_argument('attempt', type=int, default=1)
-    args = parser.parse_args()
+    args = sys.argv[1:]
+    if len(args) == 0:
+        zipname, attempt = guess_params()
+    elif len(args) == 1:
+        zipname = args[0]
+        attempt = 1
+    else:
+        zipname, attempt = args
+
+    reject_invalid = True
 
     handins = {}
 
-    with zipfile.ZipFile(args.filename, 'r') as zf:
+    with zipfile.ZipFile(zipname, 'r') as zf:
         for zinfo in zf.infolist():
             filename = zinfo.filename
             o = re.fullmatch(FILENAME, filename)
@@ -53,7 +74,7 @@ def main():
             d = o.groupdict()
 
             d['handin'] = re.sub('^Aflevering ', '', d['handin'])
-            d['handin'] += '_%d' % args.attempt
+            d['handin'] += '_%d' % attempt
             d['group'] = re.sub('^Gruppe ([A-Z]*\d+) - ', r'\1-',
                                 d['group']).replace(' ', '0')
             # d['suffix'] = re.sub('[^0-9A-Za-z_.-]+', '_', d['suffix'])
@@ -88,7 +109,7 @@ def main():
                 #             print("%s:\n%s" % (k, v.decode()))
                 #     print('')
             else:
-                if not args.all and d['extension'] not in EXTENSIONS:
+                if reject_invalid and d['extension'] not in EXTENSIONS:
                     print("Rejecting %r" % d['suffix'])
                 else:
                     handin['file'] = output_base + '_handin' + d['extension']
@@ -103,12 +124,36 @@ def main():
     handins = sorted(handins.items(), key=lambda x: x[0])
     while True:
         for i, (group, data) in enumerate(handins):
-            print("%d. %s" % (i + 1, group))
-        i = int(input()) - 1
+            try:
+                with open(data['comments_file']) as fp:
+                    comments_size = os.fstat(fp.fileno()).st_size
+                    comments = '%d B comments' % comments_size
+                    first_line = fp.readline().strip()
+            except FileNotFoundError:
+                comments = 'no comments'
+                first_line = ''
+            annotated_file = os.path.splitext(data['file'])[0] + '.pep'
+            if os.path.exists(annotated_file):
+                annotations = 'annotated'
+            else:
+                annotations = 'not annotated'
+            print("%d. %s (%s; %s) %s" % (i + 1, group, comments, annotations, first_line))
+        try:
+            i = int(input()) - 1
+        except KeyboardInterrupt:
+            break
         if 0 <= i < len(handins):
             group, data = handins[i]
             subprocess.call(('pdfa', data['file']))
             subprocess.call(('vim', data['comments_file']))
+
+    for group, data in handins:
+        print('%s' % (group,))
+        try:
+            with open(data['comments_file']) as fp:
+                print(fp.read())
+        except FileNotFoundError:
+            print("no comments\n")
 
 
 if __name__ == "__main__":
