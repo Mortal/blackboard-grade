@@ -48,6 +48,23 @@ def guess_params():
     return filename, attempt
 
 
+def print_handin_info(i, group, data):
+    try:
+        with open(data['comments_file']) as fp:
+            comments_size = os.fstat(fp.fileno()).st_size
+            comments = '%d B comments' % comments_size
+            first_line = fp.readline().strip()
+    except FileNotFoundError:
+        comments = 'no comments'
+        first_line = ''
+    annotated_file = os.path.splitext(data['file'])[0] + '.pep'
+    if os.path.exists(annotated_file):
+        annotations = 'annotated'
+    else:
+        annotations = 'not annotated'
+    print("%d. %s (%s; %s) %s" % (i + 1, group, comments, annotations, first_line))
+
+
 def handin_loop(handin):
     group, data = handin
     subprocess.call(('pdfa', data['file']))
@@ -57,20 +74,7 @@ def handin_loop(handin):
 def grade_loop(handins):
     while True:
         for i, (group, data) in enumerate(handins):
-            try:
-                with open(data['comments_file']) as fp:
-                    comments_size = os.fstat(fp.fileno()).st_size
-                    comments = '%d B comments' % comments_size
-                    first_line = fp.readline().strip()
-            except FileNotFoundError:
-                comments = 'no comments'
-                first_line = ''
-            annotated_file = os.path.splitext(data['file'])[0] + '.pep'
-            if os.path.exists(annotated_file):
-                annotations = 'annotated'
-            else:
-                annotations = 'not annotated'
-            print("%d. %s (%s; %s) %s" % (i + 1, group, comments, annotations, first_line))
+            print_handin_info(i, group, data)
         try:
             i = int(input()) - 1
         except KeyboardInterrupt:
