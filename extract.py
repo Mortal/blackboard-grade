@@ -66,24 +66,40 @@ def print_handin_info(i, group, data):
 
 
 def previous_handin(group, data):
-    handin = data['handin']
+    handin = os.path.dirname(data['file'])
     o = re.match(r'(.*_)(\d+)', handin)
+    print(o)
     if o:
         directory = o.group(1) + str(int(o.group(2)) - 1)
+        print(directory)
         base = os.path.join(directory, group)
         annotated = base + '_handin_ann.pdf'
+        print(annotated)
         if os.path.exists(annotated):
-            pass  # TODO
+            return annotated
 
 
 def handin_loop(i, handin):
     group, data = handin
-    subprocess.call(('pdfa', data['file']))
-    subprocess.call(('vim', data['comments_file']))
+    previous = previous_handin(group, data)
+    print('')
     while True:
         print_handin_info(i, group, data)
         print("0. Back")
         print("1. Annotate and edit comments")
+        if previous:
+            print("2. Open annotated previous version")
+
+        # Don't catch KeyboardInterrupt here
+        j = int(input())
+
+        if j == 1:
+            subprocess.call(('pdfa', data['file']))
+            subprocess.call(('vim', data['comments_file']))
+        elif j == 2 and previous:
+            subprocess.call(('xdg-open', previous))
+        else:
+            break
 
 
 def grade_loop(handins):
@@ -92,10 +108,10 @@ def grade_loop(handins):
             print_handin_info(i, group, data)
         try:
             i = int(input()) - 1
+            if 0 <= i < len(handins):
+                handin_loop(i, handins[i])
         except KeyboardInterrupt:
             break
-        if 0 <= i < len(handins):
-            handin_loop(i, handins[i])
 
 
 def print_comments(handins):
